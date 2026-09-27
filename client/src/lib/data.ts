@@ -1,0 +1,249 @@
+export interface Incident {
+  id: string;
+  title: string;
+  date: string;
+  severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+  team: string;
+  services_affected: string[];
+  symptoms: string;
+  root_cause: string;
+  resolution: string;
+  recovery_time_minutes: number;
+  tags: string[];
+  preventive_checks: string[];
+}
+
+export interface Pattern {
+  id: string;
+  pattern_name: string;
+  occurrences: number;
+  total_downtime_minutes: number;
+  avg_recovery_time_minutes: number;
+  severity: "CRITICAL" | "HIGH" | "MEDIUM";
+  primary_cause: string;
+  affected_systems: string[];
+  resolution_playbook: string[];
+}
+
+export interface TimelineEvent {
+  month: string;
+  title: string;
+  incidentId: string;
+  category: string;
+  impact: string;
+  type: "INCIDENT" | "PATTERN_DETECTED" | "PREVENTED";
+}
+
+export const INITIAL_INCIDENTS: Incident[] = [
+  {
+    id: "INC-017",
+    title: "PostgreSQL Connection Pool Exhaustion under Peak API Traffic",
+    date: "2026-03-14",
+    severity: "CRITICAL",
+    team: "Core Infrastructure",
+    services_affected: ["core-api", "checkout-service", "pgbouncer"],
+    symptoms: "API latency increased by 400%, HTTP 504 Gateway Timeouts on /api/v1/orders, DB connection pool saturated at 100/100 active connections.",
+    root_cause: "Max connections in PgBouncer connection pooler were capped at 100 while web service autoscaled from 10 to 50 pods during flash sale, causing pool queue backlog and thread starvation.",
+    resolution: "Increased PgBouncer pool limit from 100 to 500, tuned idle connection reaper timeout to 30s, and applied rolling restart to core-api.",
+    recovery_time_minutes: 42,
+    tags: ["postgresql", "connection-pool", "latency", "timeout", "scaling"],
+    preventive_checks: [
+      "Verify database connection pool size dynamically matches maximum pod replica bounds",
+      "Set client statement timeout to 5000ms to prevent hanging queries",
+      "Enable connection pool saturation alerts at 85% threshold"
+    ]
+  },
+  {
+    id: "INC-027",
+    title: "Redis Cache Invalidation Storm during Catalog Deployment",
+    date: "2026-04-02",
+    severity: "HIGH",
+    team: "Platform Engineering",
+    services_affected: ["catalog-service", "redis-cluster", "inventory-db"],
+    symptoms: "Sudden DB CPU spike to 100%, page rendering response time degraded from 50ms to 4500ms, cache miss rate hit 98%.",
+    root_cause: "Deployment script flushes all Redis keys globally upon catalog schema migration instead of scoped key pattern invalidation, causing thundering herd problem on primary DB.",
+    resolution: "Reverted global flush command, implemented targeted key prefix purging with soft TTL fallback, and deployed cache warming worker.",
+    recovery_time_minutes: 28,
+    tags: ["redis", "cache-invalidation", "thundering-herd", "deployment"],
+    preventive_checks: [
+      "Prohibit FLUSHALL / FLUSHDB in production deployment scripts",
+      "Implement probabilistic cache warming prior to key expiration",
+      "Use mutex locks on cache fetch misses to single-thread backend DB queries"
+    ]
+  },
+  {
+    id: "INC-045",
+    title: "Kafka Consumer Lag & Memory Leak in Event Processor",
+    date: "2026-05-19",
+    severity: "CRITICAL",
+    team: "Data Pipeline SRE",
+    services_affected: ["event-stream", "kafka-cluster", "analytics-ingest"],
+    symptoms: "Kafka consumer lag exceeded 1.5M messages, Kubernetes pods triggering OOMKilled crashes repeatedly every 15 minutes.",
+    root_cause: "Unbounded memory buffer in Go consumer loop accumulated unprocessed payload objects during schema validation errors without releasing memory.",
+    resolution: "Added buffer size limit (5000 events max), added dead-letter queue (DLQ) routing for invalid payloads, bumped pod memory limit from 2Gi to 4Gi.",
+    recovery_time_minutes: 65,
+    tags: ["kafka", "memory-leak", "oom-killed", "consumer-lag", "dlq"],
+    preventive_checks: [
+      "Verify consumer buffer bounds and memory profile under artificial error injection",
+      "Ensure Dead Letter Queue (DLQ) is enabled for deserialization errors",
+      "Configure Kafka consumer lag alerts at >10,000 pending messages"
+    ]
+  },
+  {
+    id: "INC-012",
+    title: "DNS Resolution Timeout Across Kubernetes Nodes",
+    date: "2026-02-10",
+    severity: "HIGH",
+    team: "Cloud Infrastructure",
+    services_affected: ["coredns", "kube-proxy", "all-microservices"],
+    symptoms: "Intermittent lookup failures for internal endpoints, services reporting 502 Bad Gateway randomly across 3 worker nodes.",
+    root_cause: "CoreDNS pods underprovisioned for UDP packet burst, combined with single-threaded conntrack table exhaustion on Linux kernel.",
+    resolution: "Deployed NodeLocal DNSCache daemonset, increased CoreDNS replicas from 2 to 6 with autoscaling, tuned net.netfilter.nf_conntrack_max.",
+    recovery_time_minutes: 35,
+    tags: ["dns", "kubernetes", "coredns", "conntrack", "networking"],
+    preventive_checks: [
+      "Ensure NodeLocal DNSCache is running on all worker nodes",
+      "Monitor CoreDNS CPU/Memory metrics and set HPA scaling threshold at 60% CPU"
+    ]
+  },
+  {
+    id: "INC-033",
+    title: "Elasticsearch Disk Saturation & Write Lock Deadlock",
+    date: "2026-04-22",
+    severity: "MEDIUM",
+    team: "Observability",
+    services_affected: ["elasticsearch", "kibana", "log-collector"],
+    symptoms: "Log ingestion stalled, Elasticsearch cluster status turned RED, disk watermarks exceeded 95%.",
+    root_cause: "Log retention ILM policy failed to execute due to read-only block triggered when disk space passed 95% flood-stage threshold.",
+    resolution: "Expanded persistent storage volume size by 500GB, manually unblocked indices read_only_allow_delete setting, forced snapshot retention run.",
+    recovery_time_minutes: 50,
+    tags: ["elasticsearch", "disk-full", "logging", "ilm-policy"],
+    preventive_checks: [
+      "Set disk alert notification at 80% threshold prior to flood-stage lock",
+      "Configure automatic index rollover based on age (7d) and size (50GB)"
+    ]
+  },
+  {
+    id: "INC-008",
+    title: "gRPC Keepalive Misconfiguration Causing Load Balancer Drops",
+    date: "2026-01-18",
+    severity: "MEDIUM",
+    team: "Core Platform",
+    services_affected: ["grpc-gateway", "user-service", "alb"],
+    symptoms: "gRPC connections reset with code UNAVAILABLE every 60 seconds, causing brief HTTP 503 spikes in user frontend.",
+    root_cause: "AWS ALB idle timeout was configured to 60s while gRPC client keepalive ping duration was set to 120s, resulting in silent TCP socket closure by LB.",
+    resolution: "Updated gRPC keepalive time to 30s with keepalive_timeout of 10s and permits_without_stream enabled.",
+    recovery_time_minutes: 22,
+    tags: ["grpc", "load-balancer", "keepalive", "tcp-timeout"],
+    preventive_checks: [
+      "Ensure gRPC client keepalive interval is less than cloud load balancer idle timeout",
+      "Enable HTTP/2 ping frame monitoring on ALB"
+    ]
+  },
+  {
+    id: "INC-052",
+    title: "Stripe Webhook Processing Duplicate Execution & Race Condition",
+    date: "2026-06-03",
+    severity: "HIGH",
+    team: "Payments",
+    services_affected: ["billing-service", "stripe-webhook-handler"],
+    symptoms: "Customers charged twice for subscription renewals during Stripe webhook retries.",
+    root_cause: "Database transaction lock missed idempotency key check on incoming event payloads, allowing concurrent worker threads to process duplicate webhooks simultaneously.",
+    resolution: "Implemented Redis-based distributed lock per event_id with 30s TTL and unique database constraint on payment_event_id.",
+    recovery_time_minutes: 85,
+    tags: ["stripe", "idempotency", "race-condition", "payments", "redis-lock"],
+    preventive_checks: [
+      "Verify all external webhook endpoints check idempotency key in a transaction before processing",
+      "Use Redis distributed lock for incoming event processing"
+    ]
+  }
+];
+
+export const PATTERNS: Pattern[] = [
+  {
+    id: "PAT-001",
+    pattern_name: "Database Connection Pool Exhaustion",
+    occurrences: 6,
+    total_downtime_minutes: 246,
+    avg_recovery_time_minutes: 41,
+    severity: "CRITICAL",
+    primary_cause: "Discrepancy between web server pod autoscaling bounds and fixed database connection pooler max_connections limits.",
+    affected_systems: ["core-api", "checkout-service", "pgbouncer", "auth-service"],
+    resolution_playbook: [
+      "Increase max pool size on connection pooler (e.g., PgBouncer/HikariCP)",
+      "Set application statement timeout limit (e.g., statement_timeout = 5000ms)",
+      "Restart web service pods in batches to release lingering locks"
+    ]
+  },
+  {
+    id: "PAT-002",
+    pattern_name: "Cache Invalidation & Thundering Herd",
+    occurrences: 4,
+    total_downtime_minutes: 124,
+    avg_recovery_time_minutes: 31,
+    severity: "HIGH",
+    primary_cause: "Global cache flush commands during CD deployment scripts causing immediate DB overload.",
+    affected_systems: ["redis-cluster", "catalog-service", "inventory-db"],
+    resolution_playbook: [
+      "Switch from global cache flush to granular key prefix deletion",
+      "Implement probabilistic cache pre-warming prior to deployment",
+      "Enforce mutex locking on cache misses"
+    ]
+  },
+  {
+    id: "PAT-003",
+    pattern_name: "Unbounded Memory Buffers & OOM Crashes",
+    occurrences: 3,
+    total_downtime_minutes: 165,
+    avg_recovery_time_minutes: 55,
+    severity: "HIGH",
+    primary_cause: "Queue consumers lacking max queue capacity bounds when downstream services slow down.",
+    affected_systems: ["kafka-consumer", "event-processor", "analytics-ingest"],
+    resolution_playbook: [
+      "Enforce strict maximum element bounds on memory channels/queues",
+      "Enable Dead-Letter Queue (DLQ) fallback routing",
+      "Configure K8s pod memory request/limit ratio closer to 1.0"
+    ]
+  },
+  {
+    id: "PAT-004",
+    pattern_name: "Missing Idempotency in Payment Threads",
+    occurrences: 2,
+    total_downtime_minutes: 140,
+    avg_recovery_time_minutes: 70,
+    severity: "HIGH",
+    primary_cause: "Lack of distributed locking on concurrent external webhook callbacks.",
+    affected_systems: ["billing-service", "stripe-handler", "subscription-engine"],
+    resolution_playbook: [
+      "Acquire Redis distributed lock on event key prior to DB transaction",
+      "Enforce unique DB index on provider event payload IDs"
+    ]
+  }
+];
+
+export const TIMELINE_EVENTS: TimelineEvent[] = [
+  { month: "January", title: "gRPC Connection Timeout Spikes", incidentId: "INC-008", category: "Networking", impact: "22m downtime", type: "INCIDENT" },
+  { month: "February", title: "Kubernetes CoreDNS Packet Drops", incidentId: "INC-012", category: "Infrastructure", impact: "35m downtime", type: "INCIDENT" },
+  { month: "March", title: "Database Connection Pool Saturation", incidentId: "INC-017", category: "Database", impact: "42m downtime", type: "INCIDENT" },
+  { month: "April", title: "Redis Global Flush & Thundering Herd", incidentId: "INC-027", category: "Caching", impact: "28m downtime", type: "INCIDENT" },
+  { month: "May", title: "Kafka Consumer OOM Memory Leak", incidentId: "INC-045", category: "Data Stream", impact: "65m downtime", type: "INCIDENT" },
+  { month: "June", title: "Recurring Connection Pool Pattern Auto-Detected", incidentId: "PAT-001", category: "Pattern Intelligence", impact: "Prevented 3 recurring outages", type: "PATTERN_DETECTED" },
+  { month: "July", title: "Pre-deployment Check Alert Prevented DB Lock Outage", incidentId: "PREV-001", category: "Preventive Alerting", impact: "0m downtime (Pre-blocked)", type: "PREVENTED" }
+];
+
+export const LEARNING_CURVE_DATA = [
+  { index: 1, label: "Incident #1", accuracy: 15, responseType: "Generic Advice", mttrMinutes: 120, memoryNodes: 1 },
+  { index: 5, label: "Incident #5", accuracy: 42, responseType: "Keyword Match", mttrMinutes: 85, memoryNodes: 5 },
+  { index: 10, label: "Incident #10", accuracy: 68, responseType: "Recalls Similar Cases", mttrMinutes: 54, memoryNodes: 10 },
+  { index: 15, label: "Incident #15", accuracy: 84, responseType: "Root Cause Pattern Match", mttrMinutes: 38, memoryNodes: 15 },
+  { index: 20, label: "Incident #20", accuracy: 94, responseType: "Predicts Likely Cause & Fix", mttrMinutes: 18, memoryNodes: 20 }
+];
+
+export const MTTR_TREND_DATA = [
+  { month: "Jan", mttrNoOps: 110, mttrWithMemoryOps: 110 },
+  { month: "Feb", mttrNoOps: 105, mttrWithMemoryOps: 85 },
+  { month: "Mar", mttrNoOps: 115, mttrWithMemoryOps: 52 },
+  { month: "Apr", mttrNoOps: 98, mttrWithMemoryOps: 35 },
+  { month: "May", mttrNoOps: 120, mttrWithMemoryOps: 24 },
+  { month: "Jun", mttrNoOps: 105, mttrWithMemoryOps: 18 }
+];
