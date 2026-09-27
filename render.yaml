@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: memoryops-api-backend
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+
+  - type: web
+    name: memoryops-ai-frontend
+    env: node
+    rootDir: client
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
