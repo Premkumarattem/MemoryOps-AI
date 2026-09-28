@@ -1,4 +1,0 @@
-{
-  "buildCommand": "npm run build --prefix client",
-  "outputDirectory": "client/.next"
-}
