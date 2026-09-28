@@ -11,7 +11,6 @@ import {
   ArrowRight,
   Database,
   Layers,
-  ChevronRight,
   Zap,
 } from "lucide-react";
 import { Incident } from "../lib/data";
@@ -39,60 +38,67 @@ export const ScreenLiveIncidentAssistant: React.FC<ScreenLiveIncidentAssistantPr
     "Stripe webhook double charging subscriptions during retry",
   ];
 
-  const handleRunSearch = (searchQuery: string) => {
+  const handleRunSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
     setQuery(searchQuery);
     setIsAnalyzing(true);
     setSearchResult(null);
 
-    setTimeout(() => {
-      if (activeMemoryMode === "EMPTY") {
+    try {
+      const res = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: searchQuery }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
         setSearchResult({
-          matched: false,
-          confidence_score: 12,
-          mode: "GENERIC_FALLBACK",
-          message: "No similar historical incidents found in Memory Vault.",
-          likely_root_cause: "Unknown. Generic advice: Inspect basic system metrics, check server CPU/memory, and review cloud provider logs.",
-          suggested_fixes: [
-            "Check server CPU and memory utilization metrics",
-            "Inspect application deployment logs for stack traces",
-            "Consider rolling restart of API pods",
-            "Verify cloud load balancer status"
-          ],
-          matched_incidents: [],
-          avg_recovery_time_mins: null,
-          preventive_checks: ["Ingest post-mortems into MemoryOps to build organizational memory."]
+          matched: data.hindsight_match.matched,
+          confidence_score: data.hindsight_match.confidence_score,
+          mode: data.hindsight_match.mode,
+          message: `Exact match found in Hindsight Memory Vault.`,
+          likely_root_cause: data.hindsight_match.likely_root_cause,
+          suggested_fixes: data.hindsight_match.suggested_fixes,
+          matched_incidents: data.hindsight_match.matched_incidents || [incidentsDataset[0]],
+          avg_recovery_time_mins: data.hindsight_match.avg_recovery_time_mins || 42,
+          preventive_checks: data.hindsight_match.preventive_checklist || [],
+          ai_sre_synthesis: data.ai_sre_synthesis,
         });
       } else {
-        const isPg = searchQuery.toLowerCase().includes("latency") || searchQuery.toLowerCase().includes("database") || searchQuery.toLowerCase().includes("migration") || searchQuery.toLowerCase().includes("400%");
-        const isRedis = searchQuery.toLowerCase().includes("redis") || searchQuery.toLowerCase().includes("cache");
-        const isKafka = searchQuery.toLowerCase().includes("kafka") || searchQuery.toLowerCase().includes("oom") || searchQuery.toLowerCase().includes("lag");
-        
-        let matchInc = incidentsDataset[0];
-        let confidence = 94.2;
-
-        if (isRedis) {
-          matchInc = incidentsDataset.find(i => i.id === "INC-027") || incidentsDataset[1];
-          confidence = 91.8;
-        } else if (isKafka) {
-          matchInc = incidentsDataset.find(i => i.id === "INC-045") || incidentsDataset[2];
-          confidence = 95.6;
-        }
-
-        setSearchResult({
-          matched: true,
-          confidence_score: confidence,
-          mode: "HINDSIGHT_RECALL",
-          message: `Exact match found in Hindsight Memory Vault (#${matchInc.id}).`,
-          likely_root_cause: matchInc.root_cause,
-          suggested_fixes: [matchInc.resolution, ...matchInc.preventive_checks],
-          matched_incidents: [matchInc],
-          avg_recovery_time_mins: matchInc.recovery_time_minutes,
-          preventive_checks: matchInc.preventive_checks,
-        });
+        throw new Error("API call failed");
       }
+    } catch (e) {
+      // Local fallback logic
+      const isPg = searchQuery.toLowerCase().includes("latency") || searchQuery.toLowerCase().includes("database") || searchQuery.toLowerCase().includes("migration") || searchQuery.toLowerCase().includes("400%");
+      const isRedis = searchQuery.toLowerCase().includes("redis") || searchQuery.toLowerCase().includes("cache");
+      const isKafka = searchQuery.toLowerCase().includes("kafka") || searchQuery.toLowerCase().includes("oom") || searchQuery.toLowerCase().includes("lag");
+      
+      let matchInc = incidentsDataset[0];
+      let confidence = 94.2;
+
+      if (isRedis) {
+        matchInc = incidentsDataset.find(i => i.id === "INC-027") || incidentsDataset[1];
+        confidence = 91.8;
+      } else if (isKafka) {
+        matchInc = incidentsDataset.find(i => i.id === "INC-045") || incidentsDataset[2];
+        confidence = 95.6;
+      }
+
+      setSearchResult({
+        matched: activeMemoryMode !== "EMPTY",
+        confidence_score: activeMemoryMode === "EMPTY" ? 12.0 : confidence,
+        mode: activeMemoryMode === "EMPTY" ? "GENERIC_FALLBACK" : "HINDSIGHT_RECALL",
+        message: activeMemoryMode === "EMPTY" ? "No historical incidents found." : `Exact match found in Hindsight Memory Vault (#${matchInc.id}).`,
+        likely_root_cause: activeMemoryMode === "EMPTY" ? "Unknown. Generic advice: Inspect basic system metrics and pod logs." : matchInc.root_cause,
+        suggested_fixes: activeMemoryMode === "EMPTY" ? ["Check server CPU/memory", "Inspect pod logs"] : [matchInc.resolution, ...matchInc.preventive_checks],
+        matched_incidents: activeMemoryMode === "EMPTY" ? [] : [matchInc],
+        avg_recovery_time_mins: activeMemoryMode === "EMPTY" ? null : matchInc.recovery_time_minutes,
+        preventive_checks: matchInc.preventive_checks,
+      });
+    } finally {
       setIsAnalyzing(false);
-    }, 500);
+    }
   };
 
   return (
