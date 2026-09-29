@@ -67,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-indigo-600/30 ring-1 ring-white/20"
           >
             <Play className="w-3.5 h-3.5 fill-white" />
-            <span>60s Pitch Demo</span>
+            <span>Interactive Memory Demo</span>
           </button>
         </div>
       </div>

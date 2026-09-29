@@ -49,9 +49,9 @@ export const DemoStoryModal: React.FC<DemoStoryModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-white">60-Second Winning Hackathon Pitch</h2>
+                <h2 className="text-lg font-bold text-white">Interactive Memory Engine Demo</h2>
                 <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono">
-                  Interactive Demo Story
+                  Operational Walkthrough
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -69,9 +69,9 @@ export const DemoStoryModal: React.FC<DemoStoryModalProps> = ({
         <div className="grid grid-cols-4 gap-2 text-center text-xs font-mono">
           {[
             { step: 1, title: "Scene 1: Empty Memory" },
-            { step: 2, title: "Scene 2: Memory Build" },
+            { step: 2, title: "Scene 3: Memory Ingest" },
             { step: 3, title: "Scene 3: Hindsight Recall" },
-            { step: 4, title: "Scene 4: Judge Proof" },
+            { step: 4, title: "Scene 4: Operational Impact" },
           ].map((s) => (
             <div
               key={s.step}
@@ -190,11 +190,11 @@ export const DemoStoryModal: React.FC<DemoStoryModalProps> = ({
             </div>
           )}
 
-          {/* SCENE 4: Judge Summary */}
+          {/* SCENE 4: Value Proof */}
           {activeScene === 4 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between text-xs font-mono text-slate-400">
-                <span>SCENE 4: JUDGE VALUE DEMONSTRATION & PRODUCT PROOF</span>
+                <span>SCENE 4: OPERATIONAL VALUE & PRODUCT PROOF</span>
                 <span className="text-purple-400 font-bold">The Memory IS The Product</span>
               </div>
 
@@ -230,7 +230,7 @@ export const DemoStoryModal: React.FC<DemoStoryModalProps> = ({
               onClick={handleResetDemo}
               className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-mono"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> Reset Pitch Demo
+              <RefreshCw className="w-3.5 h-3.5" /> Reset Walkthrough
             </button>
 
             {activeScene < 4 ? (
@@ -238,7 +238,7 @@ export const DemoStoryModal: React.FC<DemoStoryModalProps> = ({
                 onClick={handleNextScene}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/30"
               >
-                <span>{activeScene === 1 ? "Upload 20 Historical Incidents →" : "Continue Pitch Demo →"}</span>
+                <span>{activeScene === 1 ? "Upload 20 Historical Incidents →" : "Continue Walkthrough →"}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             ) : (
@@ -246,7 +246,7 @@ export const DemoStoryModal: React.FC<DemoStoryModalProps> = ({
                 onClick={onClose}
                 className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg"
               >
-                <CheckCircle2 className="w-4 h-4" /> Complete Pitch & Return to App
+                <CheckCircle2 className="w-4 h-4" /> Complete Walkthrough & Return to App
               </button>
             )}
           </div>
