@@ -1,4 +1,4 @@
-# 🧠 MemoryOps AI — "The AI SRE That Never Forgets"
+# 🧠 MemoryOps AI - "The AI SRE That Never Forgets"
 
 > **Tagline:** Every outage teaches a lesson. MemoryOps ensures your organization never learns the same lesson twice.
 
